@@ -1,71 +1,38 @@
+import streamlit as st
 import tensorflow as tf
-from tensorflow.keras import layers, Model
+import numpy as np
+from PIL import Image
+from download_model import download_model  # <-- import here
 
-def create_simple_vgg16_model(num_classes=131):
-    """Create a simple VGG16-like model for 131 classes"""
-    inputs = layers.Input(shape=(224, 224, 3))
-    
-    # Block 1
-    x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(inputs)
-    x = layers.Conv2D(64, (3, 3), activation='relu', padding='same')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2))(x)
-    
-    # Block 2
-    x = layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(128, (3, 3), activation='relu', padding='same')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2))(x)
-    
-    # Block 3
-    x = layers.Conv2D(256, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(256, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(256, (3, 3), activation='relu', padding='same')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2))(x)
-    
-    # Block 4
-    x = layers.Conv2D(512, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(512, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(512, (3, 3), activation='relu', padding='same')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2))(x)
-    
-    # Block 5
-    x = layers.Conv2D(512, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(512, (3, 3), activation='relu', padding='same')(x)
-    x = layers.Conv2D(512, (3, 3), activation='relu', padding='same')(x)
-    x = layers.MaxPooling2D((2, 2), strides=(2, 2))(x)
-    
-    # Classification block
-    x = layers.Flatten()(x)
-    x = layers.Dense(4096, activation='relu')(x)
-    x = layers.Dropout(0.5)(x)
-    x = layers.Dense(4096, activation='relu')(x)
-    x = layers.Dropout(0.5)(x)
-    outputs = layers.Dense(num_classes, activation='softmax')(x)
-    
-    model = Model(inputs=inputs, outputs=outputs)
-    return model
+st.title("🍎 Fruit Classification App")
 
-# In your app.py
-def load_or_create_model():
-    MODEL_PATH = "fruit_vgg16_model.keras"
-    
-    try:
-        # Try to load existing model
-        model = tf.keras.models.load_model(MODEL_PATH)
-        st.success("Model loaded successfully!")
-        return model
-    except Exception as e:
-        st.warning(f"Could not load saved model: {e}")
-        st.info("Creating a new model architecture...")
-        
-        # Create a new model
-        model = create_simple_vgg16_model(num_classes=131)
-        model.compile(
-            optimizer='adam',
-            loss='categorical_crossentropy',
-            metrics=['accuracy']
-        )
-        
-        # Save this model for future use
-        model.save(MODEL_PATH)
-        st.success("New model created and saved!")
-        return model
+# Step 1: Download the model if not exists
+download_model()
+
+# Step 2: Load the model locally
+model = tf.keras.models.load_model("fruit_vgg16_model.keras")
+
+# Step 3: Load class names
+def load_class_names(file_path="class_names.txt"):
+    with open(file_path, "r") as f:
+        return f.read().splitlines()
+
+class_names = load_class_names()
+
+# Step 4: Upload image and predict
+uploaded_file = st.file_uploader("Upload a fruit image", type=["jpg", "jpeg", "png"])
+
+if uploaded_file:
+    img = Image.open(uploaded_file).convert("RGB")
+    st.image(img, caption="Uploaded Image", use_column_width=True)
+
+    img = img.resize((150, 150))
+    img_array = np.array(img) / 255.0
+    img_array = np.expand_dims(img_array, axis=0)
+
+    predictions = model.predict(img_array)[0]
+    top_index = predictions.argmax()
+    predicted_class = class_names[top_index]
+    confidence = predictions[top_index] * 100
+
+    st.success(f"Prediction: {predicted_class} ({confidence:.2f}%)")
