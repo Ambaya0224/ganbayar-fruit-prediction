@@ -3,61 +3,72 @@ import tensorflow as tf
 import numpy as np
 from PIL import Image
 import os
+from download_model import download_model  # make sure this exists
 
-from download_model import download_model
-
-# —————————————————————————————
+# ----------------------------
+# APP TITLE
+# ----------------------------
 st.title("🍎 Fruit Classification App")
 
-# Step 1: Download the model
+# ----------------------------
+# DOWNLOAD MODEL
+# ----------------------------
 download_model()
 
 MODEL_PATH = "fruit_vgg16_model.keras"
 
-# Step 2: Validate model file
+# Validate model file
 if not os.path.exists(MODEL_PATH):
-    st.error("❌ Model file not found. Please check Google Drive link and download logic.")
+    st.error("❌ Model file not found. Download may have failed.")
     st.stop()
 
-file_size = os.path.getsize(MODEL_PATH)
-st.write(f"Model file size (bytes): {file_size}")
-
-if file_size < 100_000_000:
-    st.error("❌ Model file seems corrupted or incomplete (too small).")
+if os.path.getsize(MODEL_PATH) < 100_000_000:
+    st.error("❌ Model file appears corrupted or incomplete.")
     st.stop()
 
-st.success("✅ Model file is present and valid. Loading model...")
+st.success("Model file downloaded and verified.")
 
-# Step 3: Load the model
+# ----------------------------
+# LOAD MODEL
+# ----------------------------
 try:
     model = tf.keras.models.load_model(MODEL_PATH)
-    st.success("Model loaded successfully!")
+    st.success("Model loaded successfully! 🎉")
 except Exception as e:
-    st.error("❌ Failed to load model. The model file may be corrupted or invalid.")
+    st.error("❌ Failed to load model. The file may be corrupted.")
     st.code(str(e))
     st.stop()
 
-# Step 4: Load class names
+# ----------------------------
+# LOAD CLASS NAMES
+# ----------------------------
 def load_class_names(file_path="class_names.txt"):
-    if not os.path.exists(file_path):
-        st.error("❌ class_names.txt not found.")
+    try:
+        with open(file_path, "r") as f:
+            return f.read().splitlines()
+    except Exception as e:
+        st.error("❌ Could not load class_names.txt.")
+        st.code(str(e))
         st.stop()
-    with open(file_path, "r") as f:
-        return f.read().splitlines()
 
 class_names = load_class_names()
 
-# Step 5: Upload image and predict
+# ----------------------------
+# IMAGE UPLOADER & PREDICTION
+# ----------------------------
 uploaded_file = st.file_uploader("Upload a fruit image", type=["jpg", "jpeg", "png"])
 
 if uploaded_file:
     img = Image.open(uploaded_file).convert("RGB")
     st.image(img, caption="Uploaded Image", use_column_width=True)
 
-    img = img.resize((150, 150))
+    # Resize to match model input
+    target_size = (64, 64)  # match your model input
+    img = img.resize(target_size)
     img_array = np.array(img) / 255.0
     img_array = np.expand_dims(img_array, axis=0)
 
+    # Predict
     predictions = model.predict(img_array)[0]
     top_index = predictions.argmax()
     predicted_class = class_names[top_index]
